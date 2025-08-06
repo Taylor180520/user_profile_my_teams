@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
-import { Search, Plus, ChevronDown, ChevronRight, Filter, X, Users, Info, MoreVertical } from 'lucide-react';
+import { Search, Plus, ChevronDown, ChevronRight, X, Users, Info, MoreVertical } from 'lucide-react';
 import KnowledgeBooksDropdown from './KnowledgeBooksDropdown';
 import AccessLevelDropdown from './AccessLevelDropdown';
 import RoleGroupKnowledgeBooksDropdown from './RoleGroupKnowledgeBooksDropdown';
 import RoleGroupAccessLevelDropdown from './RoleGroupAccessLevelDropdown';
+import MemberRoleGroupsDisplay from './MemberRoleGroupsDisplay';
 import AddMemberModal from './AddMemberModal';
 import AddGroupModal from './AddGroupModal';
 import BulkAddRoleGroupModal from './BulkAddRoleGroupModal';
@@ -21,11 +22,7 @@ interface Member {
   roleGroups: string[];
 }
 
-interface FilterState {
-  knowledgeBooks: string[];
-  roleGroups: string[];
-  accessLevels: string[];
-}
+
 
 interface RoleGroup {
   id: string;
@@ -40,12 +37,7 @@ const MyTeamsTab: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'members' | 'roleGroups'>('members');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedMembers, setSelectedMembers] = useState<string[]>([]);
-  const [filters, setFilters] = useState<FilterState>({
-    knowledgeBooks: [],
-    roleGroups: [],
-    accessLevels: []
-  });
-  const [showFilters, setShowFilters] = useState(false);
+
   const [selectedKnowledgeBook, setSelectedKnowledgeBook] = useState<{[memberId: string]: string}>({});
   const [isAddMemberModalOpen, setIsAddMemberModalOpen] = useState(false);
   const [isAddGroupModalOpen, setIsAddGroupModalOpen] = useState(false);
@@ -72,7 +64,7 @@ const MyTeamsTab: React.FC = () => {
         { name: 'Work Projects', accessLevel: 'Can Edit' },
         { name: 'Tech Notes', accessLevel: 'Full access' }
       ],
-      roleGroups: ['Engineering Team'],
+      roleGroups: ['Engineering Team', 'ABC', 'Project Leads'],
     },
     {
       id: '2',
@@ -83,7 +75,7 @@ const MyTeamsTab: React.FC = () => {
         { name: 'Chatbot Resources', accessLevel: 'Can Edit' },
         { name: 'Computer Guides', accessLevel: 'View-only' }
       ],
-      roleGroups: ['Marketing Team'],
+      roleGroups: ['Marketing Team', 'Content Writers'],
     },
     {
       id: '3',
@@ -126,7 +118,7 @@ const MyTeamsTab: React.FC = () => {
         { name: 'Tech Support', accessLevel: 'Full access' },
         { name: 'Home Organization', accessLevel: 'Can Edit' }
       ],
-      roleGroups: ['Engineering Team'],
+      roleGroups: ['Engineering Team', 'QA Team', 'Technical Writers', 'Project Leads'],
     },
     {
       id: '7',
@@ -257,25 +249,11 @@ const MyTeamsTab: React.FC = () => {
   }, [openGroupMenus, editingGroupId, handleRenameSubmit]);
 
   const filteredMembers = members.filter(member => {
-    // Search filter
+    // Search filter only
     const matchesSearch = member.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       member.email.toLowerCase().includes(searchQuery.toLowerCase());
     
-    // Knowledge Books filter
-    const matchesKnowledgeBooks = filters.knowledgeBooks.length === 0 ||
-      member.knowledgeBooks.some(kb => filters.knowledgeBooks.includes(kb.name));
-    
-    // Role Groups filter
-    const matchesRoleGroups = filters.roleGroups.length === 0 ||
-      member.roleGroups.some(rg => filters.roleGroups.includes(rg));
-    
-    // Access Level filter
-    const currentKB = selectedKnowledgeBook[member.id];
-    const currentAccess = member.knowledgeBooks.find(kb => kb.name === currentKB)?.accessLevel;
-    const matchesAccessLevel = filters.accessLevels.length === 0 ||
-      (currentAccess && filters.accessLevels.includes(currentAccess));
-    
-    return matchesSearch && matchesKnowledgeBooks && matchesRoleGroups && matchesAccessLevel;
+    return matchesSearch;
   });
 
   const filteredGroups = roleGroups.filter(group =>
@@ -298,26 +276,7 @@ const MyTeamsTab: React.FC = () => {
     }
   };
 
-  const handleFilterChange = (category: keyof FilterState, value: string, checked: boolean) => {
-    setFilters(prev => ({
-      ...prev,
-      [category]: checked 
-        ? [...prev[category], value]
-        : prev[category].filter(item => item !== value)
-    }));
-  };
 
-  const clearFilters = () => {
-    setFilters({
-      knowledgeBooks: [],
-      roleGroups: [],
-      accessLevels: []
-    });
-  };
-
-  const getActiveFilterCount = () => {
-    return filters.knowledgeBooks.length + filters.roleGroups.length + filters.accessLevels.length;
-  };
 
   const handleKnowledgeBookSelect = (memberId: string, knowledgeBook: string) => {
     setSelectedKnowledgeBook(prev => ({
@@ -423,10 +382,7 @@ const MyTeamsTab: React.FC = () => {
     return member.knowledgeBooks.find(kb => kb.name === currentKB)?.accessLevel || 'View-only';
   };
 
-  // Get unique values for filters
-  const allKnowledgeBooks = Array.from(new Set(members.flatMap(m => m.knowledgeBooks.map(kb => kb.name))));
-  const allRoleGroups = Array.from(new Set(members.flatMap(m => m.roleGroups)));
-  const allAccessLevels = ['View-only', 'Can Edit', 'Full access'];
+
 
   return (
     <div className="space-y-6">
@@ -467,101 +423,7 @@ const MyTeamsTab: React.FC = () => {
           />
         </div>
         
-        {activeTab === 'members' && (
-          <div className="flex items-center gap-3">
-            {/* Filters */}
-            <div className="relative">
-              <button
-                onClick={() => setShowFilters(!showFilters)}
-                className={`flex items-center gap-2 px-3 py-2 border rounded-lg transition-colors ${
-                  getActiveFilterCount() > 0
-                    ? 'border-violet-600 bg-violet-50 dark:bg-violet-900/20 text-violet-600 dark:text-violet-400'
-                    : 'border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
-                }`}
-              >
-                <Filter size={16} />
-                <span className="text-sm">Filters</span>
-                {getActiveFilterCount() > 0 && (
-                  <span className="bg-violet-600 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
-                    {getActiveFilterCount()}
-                  </span>
-                )}
-              </button>
-              
-              {showFilters && (
-                <div className="absolute top-full right-0 mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-20 w-80">
-                  <div className="p-4 space-y-4">
-                    <div className="flex items-center justify-between">
-                      <h3 className="font-medium text-gray-900 dark:text-white">Filters</h3>
-                      {getActiveFilterCount() > 0 && (
-                        <button
-                          onClick={clearFilters}
-                          className="text-sm text-violet-600 dark:text-violet-400 hover:underline"
-                        >
-                          Clear all
-                        </button>
-                      )}
-                    </div>
-                    
-                    {/* Knowledge Books Filter */}
-                    <div>
-                      <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Knowledge Books</h4>
-                      <div className="space-y-2 max-h-32 overflow-y-auto">
-                        {allKnowledgeBooks.map(book => (
-                          <label key={book} className="flex items-center">
-                            <input
-                              type="checkbox"
-                              checked={filters.knowledgeBooks.includes(book)}
-                              onChange={(e) => handleFilterChange('knowledgeBooks', book, e.target.checked)}
-                              className="w-4 h-4 text-violet-600 bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 rounded focus:ring-violet-600 focus:ring-2 mr-2"
-                            />
-                            <span className="text-sm text-gray-900 dark:text-white">{book}</span>
-                          </label>
-                        ))}
-                      </div>
-                    </div>
-                    
-                    {/* Role Groups Filter */}
-                    <div>
-                      <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Role Groups</h4>
-                      <div className="space-y-2">
-                        {allRoleGroups.map(group => (
-                          <label key={group} className="flex items-center">
-                            <input
-                              type="checkbox"
-                              checked={filters.roleGroups.includes(group)}
-                              onChange={(e) => handleFilterChange('roleGroups', group, e.target.checked)}
-                              className="w-4 h-4 text-violet-600 bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 rounded focus:ring-violet-600 focus:ring-2 mr-2"
-                            />
-                            <span className="text-sm text-gray-900 dark:text-white">{group}</span>
-                          </label>
-                        ))}
-                      </div>
-                    </div>
-                    
-                    {/* Access Level Filter */}
-                    <div>
-                      <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Access Level</h4>
-                      <div className="space-y-2">
-                        {allAccessLevels.map(level => (
-                          <label key={level} className="flex items-center">
-                            <input
-                              type="checkbox"
-                              checked={filters.accessLevels.includes(level)}
-                              onChange={(e) => handleFilterChange('accessLevels', level, e.target.checked)}
-                              className="w-4 h-4 text-violet-600 bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 rounded focus:ring-violet-600 focus:ring-2 mr-2"
-                            />
-                            <span className="text-sm text-gray-900 dark:text-white">{level}</span>
-                          </label>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
+
         
         <button
           onClick={() => activeTab === 'members' ? setIsAddMemberModalOpen(true) : setIsAddGroupModalOpen(true)}
@@ -638,15 +500,7 @@ const MyTeamsTab: React.FC = () => {
                     />
                   </div>
                   <div className="col-span-2">
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm text-gray-900 dark:text-white">
-                        {member.roleGroups.join(', ')}
-                        {member.roleGroups.length > 1 && (
-                          <span className="ml-1 text-gray-500 dark:text-gray-400">+{member.roleGroups.length - 1}</span>
-                        )}
-                      </span>
-                      <ChevronDown size={16} className="text-gray-400 dark:text-gray-500" />
-                    </div>
+                    <MemberRoleGroupsDisplay roleGroups={member.roleGroups} />
                   </div>
                   <div className="col-span-2">
                     <AccessLevelDropdown
@@ -884,7 +738,7 @@ const MyTeamsTab: React.FC = () => {
             type: 'Custom' as const,
             knowledgeBooks: groupData.knowledgeBooks.map(kb => ({
               name: kb,
-              accessLevel: groupData.accessLevel === 'Full Access' ? 'Full access' as const : groupData.accessLevel as 'View-only' | 'Can Edit'
+              accessLevel: groupData.accessLevel
             })),
             memberCount: groupData.members.length,
             members: groupData.members.map(email => {
