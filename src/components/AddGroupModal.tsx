@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { X, ChevronDown, Info, Mail } from 'lucide-react';
+import { X, ChevronDown, Info, Mail, Search } from 'lucide-react';
 import Tooltip from './Tooltip';
 
 interface Member {
@@ -8,14 +8,18 @@ interface Member {
   email: string;
 }
 
+interface KnowledgeBookPermission {
+  name: string;
+  accessLevel: 'View-only' | 'Can Edit' | 'Full access';
+}
+
 interface AddGroupModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSubmit: (groupData: {
     name: string;
     members: string[];
-    knowledgeBooks: string[];
-    accessLevel: 'View-only' | 'Can Edit' | 'Full access';
+    knowledgeBooks: KnowledgeBookPermission[];
   }) => void;
 }
 
@@ -27,15 +31,17 @@ const AddGroupModal: React.FC<AddGroupModalProps> = ({
   const [formData, setFormData] = useState({
     name: '',
     members: [] as string[],
-    knowledgeBooks: [] as string[],
-    accessLevel: 'View-only' as 'View-only' | 'Can Edit' | 'Full access'
   });
 
   const [memberInput, setMemberInput] = useState('');
   const [filteredMembers, setFilteredMembers] = useState<Member[]>([]);
   const [showMemberDropdown, setShowMemberDropdown] = useState(false);
-  const [showKnowledgeBooksDropdown, setShowKnowledgeBooksDropdown] = useState(false);
-  const [showAccessLevelDropdown, setShowAccessLevelDropdown] = useState(false);
+  
+  // Knowledge Books related states
+  const [selectedBooks, setSelectedBooks] = useState<string[]>([]);
+  const [bookPermissions, setBookPermissions] = useState<{[book: string]: 'View-only' | 'Can Edit' | 'Full access'}>({});
+  const [dropdownStates, setDropdownStates] = useState<{[book: string]: boolean}>({});
+  const [searchQuery, setSearchQuery] = useState('');
 
   const memberInputRef = useRef<HTMLInputElement>(null);
 
@@ -89,6 +95,11 @@ const AddGroupModal: React.FC<AddGroupModalProps> = ({
       setShowMemberDropdown(false);
     }
   }, [memberInput, formData.members]);
+
+  // Filter knowledge books based on search query
+  const filteredKnowledgeBooks = availableKnowledgeBooks.filter(book =>
+    book.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
   // Handle email validation
   const isValidEmail = (email: string) => {
@@ -154,13 +165,40 @@ const AddGroupModal: React.FC<AddGroupModalProps> = ({
     }));
   };
 
-  // Toggle knowledge book selection
-  const toggleKnowledgeBook = (book: string) => {
-    setFormData(prev => ({
+  // Handle knowledge book selection
+  const handleBookToggle = (book: string) => {
+    setSelectedBooks(prev => {
+      const newSelection = prev.includes(book) 
+        ? prev.filter(b => b !== book)
+        : [...prev, book];
+      
+      // Set default access level for newly selected books
+      if (!prev.includes(book)) {
+        setBookPermissions(prevPerms => ({
+          ...prevPerms,
+          [book]: 'View-only'
+        }));
+      }
+      
+      return newSelection;
+    });
+  };
+
+  const handleAccessLevelChange = (book: string, accessLevel: 'View-only' | 'Can Edit' | 'Full access') => {
+    setBookPermissions(prev => ({
       ...prev,
-      knowledgeBooks: prev.knowledgeBooks.includes(book)
-        ? prev.knowledgeBooks.filter(kb => kb !== book)
-        : [...prev.knowledgeBooks, book]
+      [book]: accessLevel
+    }));
+    setDropdownStates(prev => ({
+      ...prev,
+      [book]: false
+    }));
+  };
+
+  const toggleDropdown = (book: string) => {
+    setDropdownStates(prev => ({
+      ...prev,
+      [book]: !prev[book]
     }));
   };
 
@@ -170,16 +208,43 @@ const AddGroupModal: React.FC<AddGroupModalProps> = ({
     return member ? `${member.name} (${email})` : email;
   };
 
+  const getAccessLevelColor = (level: 'View-only' | 'Can Edit' | 'Full access') => {
+    switch (level) {
+      case 'View-only':
+        return 'text-gray-600 dark:text-gray-400';
+      case 'Can Edit':
+        return 'text-blue-600 dark:text-blue-400';
+      case 'Full access':
+        return 'text-green-600 dark:text-green-400';
+      default:
+        return 'text-gray-600 dark:text-gray-400';
+    }
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (formData.name.trim()) {
-      onSubmit(formData);
+      // Prepare knowledge book permissions
+      const knowledgeBooks: KnowledgeBookPermission[] = selectedBooks.map(book => ({
+        name: book,
+        accessLevel: bookPermissions[book] || 'View-only'
+      }));
+
+      onSubmit({
+        name: formData.name,
+        members: formData.members,
+        knowledgeBooks
+      });
+      
+      // Reset form
       setFormData({
         name: '',
         members: [],
-        knowledgeBooks: [],
-        accessLevel: 'View-only'
       });
+      setSelectedBooks([]);
+      setBookPermissions({});
+      setDropdownStates({});
+      setSearchQuery('');
       setMemberInput('');
     }
   };
@@ -188,9 +253,11 @@ const AddGroupModal: React.FC<AddGroupModalProps> = ({
     setFormData({
       name: '',
       members: [],
-      knowledgeBooks: [],
-      accessLevel: 'View-only'
     });
+    setSelectedBooks([]);
+    setBookPermissions({});
+    setDropdownStates({});
+    setSearchQuery('');
     setMemberInput('');
     onClose();
   };
@@ -283,82 +350,77 @@ const AddGroupModal: React.FC<AddGroupModalProps> = ({
             </div>
           </div>
 
-          {/* Knowledge Books */}
+          {/* Knowledge Books Section */}
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Knowledge Books
+              Knowledge Books (Optional)
             </label>
-            <div className="relative">
-              <button
-                type="button"
-                onClick={() => setShowKnowledgeBooksDropdown(!showKnowledgeBooksDropdown)}
-                className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg text-left text-gray-900 dark:text-white focus:border-violet-600 focus:outline-none flex items-center justify-between"
-              >
-                <span>
-                  {formData.knowledgeBooks.length === 0
-                    ? 'Select knowledge books'
-                    : `${formData.knowledgeBooks.length} selected`}
-                </span>
-                <ChevronDown size={16} className="text-gray-400" />
-              </button>
-              {showKnowledgeBooksDropdown && (
-                <div className="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg shadow-lg z-10 max-h-48 overflow-y-auto">
-                  {availableKnowledgeBooks.map((book) => (
-                    <label
-                      key={book}
-                      className="flex items-center px-3 py-2 hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer"
-                    >
-                      <input
-                        type="checkbox"
-                        checked={formData.knowledgeBooks.includes(book)}
-                        onChange={() => toggleKnowledgeBook(book)}
-                        className="w-4 h-4 text-violet-600 bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 rounded focus:ring-violet-600 focus:ring-2 mr-3"
-                      />
-                      <span className="text-sm text-gray-900 dark:text-white">{book}</span>
-                    </label>
+            
+            <p className="text-gray-500 dark:text-gray-400 text-sm mb-4">
+              Configure knowledge book permissions now, or leave empty to configure later.
+            </p>
+            
+            {/* Search Box */}
+            <div className="relative mb-4">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500" size={20} />
+              <input
+                type="text"
+                placeholder="Search knowledge books..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-10 pr-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-500 focus:border-violet-600 focus:outline-none focus:bg-white dark:focus:bg-gray-800"
+              />
+            </div>
+
+            {/* Knowledge Books List */}
+            <div className="max-h-80 overflow-y-auto bg-gray-50 dark:bg-gray-800/50 rounded-xl border border-gray-200 dark:border-gray-700">
+              {filteredKnowledgeBooks.length > 0 ? (
+                <div className="p-4 space-y-3">
+                  {filteredKnowledgeBooks.map((book) => (
+                    <div key={book} className="flex items-center justify-between p-3 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+                      <label className="flex items-center cursor-pointer flex-1">
+                        <input
+                          type="checkbox"
+                          checked={selectedBooks.includes(book)}
+                          onChange={() => handleBookToggle(book)}
+                          className="w-4 h-4 text-violet-600 bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 rounded focus:ring-violet-600 focus:ring-2 mr-3"
+                        />
+                        <span className="text-sm font-medium text-gray-900 dark:text-white">{book}</span>
+                      </label>
+                      
+                      {selectedBooks.includes(book) && (
+                        <div className="relative ml-4">
+                          <button
+                            type="button"
+                            onClick={() => toggleDropdown(book)}
+                            className={`px-3 py-1.5 text-sm font-medium rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors flex items-center gap-2 ${getAccessLevelColor(bookPermissions[book] || 'View-only')}`}
+                          >
+                            {bookPermissions[book] || 'View-only'}
+                            <ChevronDown size={14} className="text-gray-400" />
+                          </button>
+                          
+                          {dropdownStates[book] && (
+                            <div className="absolute top-full right-0 mt-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg shadow-lg z-10 min-w-32">
+                              {accessLevels.map((level) => (
+                                <button
+                                  key={level}
+                                  type="button"
+                                  onClick={() => handleAccessLevelChange(book, level)}
+                                  className={`w-full px-3 py-2 text-left text-sm hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors ${getAccessLevelColor(level)}`}
+                                >
+                                  {level}
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
                   ))}
                 </div>
-              )}
-            </div>
-          </div>
-
-          {/* Access Level */}
-          <div>
-            <div className="flex items-center gap-2 mb-2">
-              <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                Access Level
-              </label>
-              <Tooltip 
-                text="This Access Level will be granted to this new role group for the selected knowledge book(s)."
-                position="top"
-              >
-                <Info size={16} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 cursor-help" />
-              </Tooltip>
-            </div>
-            <div className="relative">
-              <button
-                type="button"
-                onClick={() => setShowAccessLevelDropdown(!showAccessLevelDropdown)}
-                className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg text-left text-gray-900 dark:text-white focus:border-violet-600 focus:outline-none flex items-center justify-between"
-              >
-                <span>{formData.accessLevel}</span>
-                <ChevronDown size={16} className="text-gray-400" />
-              </button>
-              {showAccessLevelDropdown && (
-                <div className="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg shadow-lg z-10">
-                  {accessLevels.map((level) => (
-                    <button
-                      key={level}
-                      type="button"
-                      onClick={() => {
-                        setFormData(prev => ({ ...prev, accessLevel: level }));
-                        setShowAccessLevelDropdown(false);
-                      }}
-                      className="w-full px-3 py-2 text-left text-sm text-gray-900 dark:text-white hover:bg-gray-50 dark:hover:bg-gray-700"
-                    >
-                      {level}
-                    </button>
-                  ))}
+              ) : (
+                <div className="p-8 text-center text-gray-500 dark:text-gray-400 text-sm">
+                  No knowledge books found
                 </div>
               )}
             </div>
