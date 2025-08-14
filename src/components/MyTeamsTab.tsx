@@ -772,7 +772,7 @@ const MyTeamsTab: React.FC = () => {
                         className="flex items-center gap-2 px-3 py-2 text-sm text-violet-600 dark:text-violet-400 hover:text-violet-700 dark:hover:text-violet-300 hover:bg-violet-50 dark:hover:bg-violet-900/30 rounded-lg transition-colors"
                       >
                         <span className="text-lg">➕</span>
-                        添加
+                        Add
                       </button>
                     ) : (
                       <KnowledgeBooksDropdown
@@ -928,7 +928,7 @@ const MyTeamsTab: React.FC = () => {
                               className="flex items-center gap-2 px-3 py-2 text-sm text-violet-600 dark:text-violet-400 hover:text-violet-700 dark:hover:text-violet-300 hover:bg-violet-50 dark:hover:bg-violet-900/30 rounded-lg transition-colors"
                             >
                               <span className="text-lg">➕</span>
-                              添加
+                            Add
                             </button>
                           </Tooltip>
                         )
